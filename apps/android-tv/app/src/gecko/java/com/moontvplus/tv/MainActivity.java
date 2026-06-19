@@ -4,7 +4,6 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -12,6 +11,7 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 
+import org.json.JSONObject;
 import org.mozilla.geckoview.GeckoRuntime;
 import org.mozilla.geckoview.GeckoSession;
 import org.mozilla.geckoview.GeckoView;
@@ -93,57 +93,31 @@ public class MainActivity extends Activity implements RemoteCommandHandler {
 
     @Override
     public void onRemoteKey(String key, boolean repeat, String digit) {
-        int keyCode = keyCodeForRemoteKey(key, digit);
-        if (keyCode == KeyEvent.KEYCODE_UNKNOWN) return;
-        mainHandler.post(() -> {
-            if (keyCode == KeyEvent.KEYCODE_BACK) {
-                onBackPressed();
-                return;
-            }
-            dispatchKeyCode(keyCode, repeat);
-        });
+        mainHandler.post(() -> dispatchLocalRemoteKey(key, repeat, digit));
     }
 
     @Override
     public void onRemoteText(String mode, String text) {
-        mainHandler.post(() -> {
-            String safeMode = mode == null ? "replace" : mode;
-            if ("clear".equals(safeMode) || "replace".equals(safeMode)) {
-                dispatchCtrlA();
-                dispatchKeyCode(KeyEvent.KEYCODE_DEL, false);
-            } else if ("backspace".equals(safeMode)) {
-                dispatchKeyCode(KeyEvent.KEYCODE_DEL, false);
-                return;
-            }
-
-            if (!"clear".equals(safeMode) && text != null && !text.isEmpty()) {
-                dispatchText(text);
-            }
-        });
+        mainHandler.post(() -> dispatchLocalRemoteText(mode, text));
     }
 
-    private void dispatchKeyCode(int keyCode, boolean repeat) {
-        long now = System.currentTimeMillis();
-        geckoView.dispatchKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, repeat ? 1 : 0));
-        geckoView.dispatchKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0));
+    private void dispatchLocalRemoteKey(String key, boolean repeat, String digit) {
+        if (session == null || key == null) return;
+        String script = "javascript:window.dispatchEvent(new CustomEvent('moontv:local-remote-key',{detail:{key:"
+                + JSONObject.quote(key)
+                + ",repeat:" + (repeat ? "true" : "false")
+                + ",digit:" + JSONObject.quote(digit == null ? "" : digit)
+                + "}}));void(0)";
+        session.loadUri(script);
     }
 
-    private void dispatchCtrlA() {
-        long now = System.currentTimeMillis();
-        geckoView.dispatchKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_A, 0, KeyEvent.META_CTRL_ON));
-        geckoView.dispatchKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_A, 0, KeyEvent.META_CTRL_ON));
-    }
-
-    private void dispatchText(String text) {
-        KeyEvent[] events = KeyCharacterMap.load(KeyCharacterMap.VIRTUAL_KEYBOARD).getEvents(text.toCharArray());
-        if (events != null) {
-            for (KeyEvent event : events) {
-                geckoView.dispatchKeyEvent(event);
-            }
-            return;
-        }
-
-        geckoView.dispatchKeyEvent(new KeyEvent(System.currentTimeMillis(), text, KeyCharacterMap.VIRTUAL_KEYBOARD, 0));
+    private void dispatchLocalRemoteText(String mode, String text) {
+        if (session == null) return;
+        String script = "javascript:window.dispatchEvent(new CustomEvent('moontv:local-remote-text',{detail:{mode:"
+                + JSONObject.quote(mode == null ? "replace" : mode)
+                + ",text:" + JSONObject.quote(text == null ? "" : text)
+                + "}}));void(0)";
+        session.loadUri(script);
     }
 
     private String withLocalRemoteHash(String url) {

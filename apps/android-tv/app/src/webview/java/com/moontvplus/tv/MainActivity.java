@@ -181,26 +181,19 @@ public class MainActivity extends Activity implements RemoteCommandHandler {
         return KeyEvent.KEYCODE_UNKNOWN;
     }
 
+
+    private void dispatchLocalRemoteKey(String key, boolean repeat, String digit) {
+        if (webView == null || key == null) return;
+        String safeKey = key.replace("\\", "\\\\").replace("'", "\\'");
+        String safeDigit = digit == null ? "" : digit.replace("\\", "\\\\").replace("'", "\\'");
+        String script = "window.dispatchEvent(new CustomEvent('moontv:local-remote-key',{detail:{key:'"
+                + safeKey + "',repeat:" + (repeat ? "true" : "false") + ",digit:'" + safeDigit + "'}}));";
+        webView.evaluateJavascript(script, null);
+    }
+
     @Override
     public void onRemoteKey(String key, boolean repeat, String digit) {
-        int keyCode = keyCodeForRemoteKey(key, digit);
-        if (keyCode == KeyEvent.KEYCODE_UNKNOWN) return;
-        mainHandler.post(() -> {
-            if (keyCode == KeyEvent.KEYCODE_BACK) {
-                onBackPressed();
-                return;
-            }
-            long now = System.currentTimeMillis();
-            KeyEvent down = new KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, repeat ? 1 : 0);
-            KeyEvent up = new KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0);
-            if (customView != null) {
-                customView.dispatchKeyEvent(down);
-                customView.dispatchKeyEvent(up);
-            } else if (webView != null) {
-                webView.dispatchKeyEvent(down);
-                webView.dispatchKeyEvent(up);
-            }
-        });
+        mainHandler.post(() -> dispatchLocalRemoteKey(key, repeat, digit));
     }
 
     @Override

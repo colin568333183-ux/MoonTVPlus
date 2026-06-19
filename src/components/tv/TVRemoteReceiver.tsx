@@ -67,6 +67,13 @@ export default function TVRemoteReceiver() {
       } catch {}
     };
 
+    const onLocalRemoteKey = (event: Event) => {
+      const detail = (event as CustomEvent<TVRemoteKeyCommand>).detail;
+      if (detail?.key) {
+        fireTVRemoteKey(detail);
+      }
+    };
+
     const onLocalRemoteText = (event: Event) => {
       const detail = (event as CustomEvent<TVRemoteTextCommand>).detail;
       if (detail?.mode) {
@@ -76,12 +83,14 @@ export default function TVRemoteReceiver() {
 
     syncLocalRemoteUrl();
     window.addEventListener('hashchange', syncLocalRemoteUrl);
+    window.addEventListener('moontv:local-remote-key', onLocalRemoteKey);
     window.addEventListener('moontv:local-remote-text', onLocalRemoteText);
 
     const auth = getAuthInfoFromBrowserCookie();
     if (!auth?.username) {
       return () => {
         window.removeEventListener('hashchange', syncLocalRemoteUrl);
+        window.removeEventListener('moontv:local-remote-key', onLocalRemoteKey);
         window.removeEventListener('moontv:local-remote-text', onLocalRemoteText);
       };
     }
@@ -151,6 +160,7 @@ export default function TVRemoteReceiver() {
       document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('focus', updateState);
       window.removeEventListener('hashchange', syncLocalRemoteUrl);
+      window.removeEventListener('moontv:local-remote-key', onLocalRemoteKey);
       window.removeEventListener('moontv:local-remote-text', onLocalRemoteText);
       socket.off('connect', register);
       socket.off('tv-remote:key');
